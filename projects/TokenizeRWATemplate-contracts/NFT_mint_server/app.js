@@ -149,6 +149,10 @@ app.post('/api/pin-image', upload.single('file'), async (req, res) => {
   }
 })
 
+app.get('/', (_req, res) => {
+  res.status(200).json({ ok: true, message: 'NFT Mint Server is running' })
+})
+
 // Catch-all 404 (so we KNOW Express is being hit)
 app.use((req, res) => {
   console.log(`[MISS] ${req.method} ${req.url}`)

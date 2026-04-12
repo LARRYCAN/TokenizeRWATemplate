@@ -1,267 +1,232 @@
+import { useState } from 'react'
 import { useWallet } from '@txnlab/use-wallet-react'
 import { Link } from 'react-router-dom'
+import { useSnackbar } from 'notistack'
+import { useVeraAuth, type UserRole, roleComplianceSchemas } from './hooks/useVeraAuth'
 
-/**
- * Home Page
- * Landing page showcasing the RWA tokenization platform
- * Displays features, how it works, and CTAs to connect wallet and create assets
- */
+const ONBOARDING_ROLE_OPTIONS: Array<{ value: UserRole; label: string; description: string }> = [
+  { value: 'OWNER', label: 'Owner', description: 'Register as the asset owner with AML/KYC compliance.' },
+  { value: 'SURVEYOR', label: 'Surveyor', description: 'Register as a licensed surveyor for boundary verification.' },
+  { value: 'REALTOR', label: 'Realtor', description: 'Register as a real estate advisor with brokerage compliance.' },
+  { value: 'GOVT', label: 'Government Agent', description: 'Register as an official reviewer connected to regulatory oversight.' },
+  { value: 'ORACLE', label: 'AI Oracle', description: 'Register as an automated data source provider for verification.' },
+]
+
+const ConsensusNode = ({ id, role, desc, isApproved, onToggle }: any) => (
+  <div
+    onClick={onToggle}
+    className={`p-8 rounded-3xl border transition-all duration-300 cursor-pointer group relative overflow-hidden ${
+      isApproved
+        ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-900/20 shadow-lg shadow-amber-500/10'
+        : 'border-indigo-100 dark:border-indigo-900 bg-white dark:bg-indigo-900/40 hover:border-indigo-400'
+    }`}
+  >
+    <div className="flex justify-between items-start mb-4">
+      <span className={`text-xs font-black tracking-widest ${isApproved ? 'text-amber-600' : 'text-indigo-300 dark:text-indigo-700'}`}>
+        NODE // {id}
+      </span>
+      {isApproved && (
+        <span className="text-amber-600 dark:text-amber-400 text-xs font-bold animate-pulse">SIGNED</span>
+      )}
+    </div>
+    <h3 className={`text-xl font-bold mb-3 ${isApproved ? 'text-indigo-900 dark:text-amber-400' : 'text-indigo-900 dark:text-white'}`}>
+      {role}
+    </h3>
+    <p className="text-sm text-indigo-700/70 dark:text-indigo-300/60 leading-relaxed font-light">
+      {desc}
+    </p>
+    {isApproved && <div className="absolute bottom-0 left-0 h-1 bg-amber-500 w-full" />}
+  </div>
+)
+
 export default function Home() {
   const { activeAddress } = useWallet()
+  const { user, registerUserRole } = useVeraAuth()
+  const { enqueueSnackbar } = useSnackbar()
+
+  const [selectedRole, setSelectedRole] = useState<UserRole>('OWNER')
+  const [complianceValues, setComplianceValues] = useState<Record<string, string>>({})
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [approvals, setApprovals] = useState<Record<string, boolean>>({
+    '01': true,
+    '02': false,
+    '03': false,
+    '04': false,
+  })
+
+  const currentSchema = roleComplianceSchemas[selectedRole]
+
+  const toggleNode = (id: string) => {
+    setApprovals((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const approvedCount = Object.values(approvals).filter(Boolean).length
+  const isConsensusReached = approvedCount === 4
+
+  const onComplianceChange = (key: string, value: string) => {
+    setComplianceValues((current) => ({ ...current, [key]: value }))
+  }
+
+  const requiredFieldsComplete = currentSchema.fields.every((field) => {
+    if (!field.required) return true
+    return Boolean(complianceValues[field.key]?.trim())
+  })
+
+  const handleRoleRegistration = async () => {
+    if (!activeAddress) {
+      enqueueSnackbar('Connect your wallet before completing onboarding.', { variant: 'warning' })
+      return
+    }
+
+    if (!requiredFieldsComplete) {
+      enqueueSnackbar('Complete all required compliance fields before registering.', { variant: 'warning' })
+      return
+    }
+
+    setIsRegistering(true)
+    try {
+      registerUserRole(activeAddress, selectedRole, complianceValues)
+      enqueueSnackbar(`${selectedRole.charAt(0) + selectedRole.slice(1).toLowerCase()} registration completed.`, { variant: 'success' })
+    } catch {
+      enqueueSnackbar('Unable to complete role registration. Please try again.', { variant: 'error' })
+    } finally {
+      setIsRegistering(false)
+    }
+  }
 
   return (
-    <div className="bg-white dark:bg-slate-950">
+    <div className="bg-indigo-50 dark:bg-indigo-950 font-sans transition-colors duration-500 min-h-screen">
       {/* Hero Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-36">
         <div className="text-center">
-          <div className="inline-block mb-4 px-3 py-1 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 text-sm font-semibold rounded-full">
-            RWA Tokenization Platform
+          <div className="inline-block mb-6 px-4 py-1.5 bg-white dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold tracking-[0.2em] uppercase rounded-full shadow-sm">
+            VeraTerra // Proof of Concept
           </div>
 
-          <h1 className="mt-4 text-5xl sm:text-6xl font-bold text-slate-900 dark:text-white leading-tight">
-            Tokenize Real-World Assets on Algorand
+          <h1 className="mt-4 text-5xl sm:text-7xl font-extrabold text-indigo-900 dark:text-white leading-[1.1] tracking-tight">
+            VeraTerra
           </h1>
-
-          <p className="mt-6 text-lg sm:text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Create Algorand Standard Assets (ASA) with built-in compliance features. Perfect for founders prototyping RWA solutions.
+          <p className="mt-4 text-2xl sm:text-3xl font-light text-indigo-700/80 dark:text-indigo-300/80">
+            Trust-infrastructure for Digital Capital.
           </p>
 
-          <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/tokenize"
-              className={`px-8 py-3 rounded-lg font-semibold transition text-white shadow-md ${
-                activeAddress ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-400 cursor-not-allowed'
+              to={user.role === 'UNREGISTERED' ? '/' : '/dashboard'}
+              className={`px-10 py-4 rounded-xl font-bold transition-all shadow-xl flex items-center justify-center ${
+                activeAddress
+                  ? 'bg-indigo-600 dark:bg-indigo-500 text-white hover:scale-105 hover:bg-indigo-700'
+                  : 'bg-indigo-200 dark:bg-indigo-900 text-indigo-400 cursor-not-allowed'
               }`}
             >
-              Start Tokenizing
+              {activeAddress ? (user.role === 'UNREGISTERED' ? 'Complete Role Registration' : `Enter as ${user.label}`) : 'Access Protocol'}
             </Link>
-
-            <a
-              className="px-8 py-3 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg font-semibold hover:border-slate-400 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
-              target="_blank"
-              rel="noreferrer"
-              href="https://dev.algorand.co/concepts/assets/overview/"
-            >
-              Learn about ASAs
-            </a>
           </div>
-
-          {!activeAddress && (
-            <p className="mt-6 text-slate-500 dark:text-slate-400">Connect your wallet using the button in the top-right to get started.</p>
-          )}
         </div>
       </div>
 
-      {/* How It Works */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-20">
-        <div className="flex items-end justify-between gap-6 mb-8">
+      {user.role === 'UNREGISTERED' && activeAddress && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          <div className="rounded-[2rem] border border-amber-500/20 bg-amber-950/80 p-10 shadow-2xl shadow-amber-900/30">
+            <div className="mb-8">
+              <p className="text-xs uppercase tracking-[0.35em] text-amber-300 font-black">Role Onboarding</p>
+              <h2 className="mt-4 text-3xl font-black text-white">Register your role and compliance profile</h2>
+              <p className="mt-3 text-slate-300">Select the role that matches your regulatory responsibility, then provide the required verification details to join the consensus network.</p>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">Selected role</label>
+                  <select
+                    value={selectedRole}
+                    onChange={(event) => {
+                      const nextRole = event.target.value as UserRole
+                      setSelectedRole(nextRole)
+                      setComplianceValues({})
+                    }}
+                    className="mt-3 w-full rounded-3xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-slate-100 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                  >
+                    {ONBOARDING_ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-slate-950 text-slate-100">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6">
+                  <p className="text-xs uppercase tracking-[0.25em] text-amber-400">Role summary</p>
+                  <h3 className="mt-3 text-xl font-bold text-white">{currentSchema.title}</h3>
+                  <p className="mt-2 text-slate-400">{currentSchema.description}</p>
+                </div>
+
+                <div className="space-y-4">
+                  {currentSchema.fields.map((field) => (
+                    <label key={field.key} className="block space-y-2">
+                      <span className="text-sm font-semibold text-slate-200">{field.label}</span>
+                      <input
+                        value={complianceValues[field.key] ?? ''}
+                        onChange={(event) => onComplianceChange(field.key, event.target.value)}
+                        placeholder={field.placeholder}
+                        className="w-full rounded-3xl border border-slate-700 bg-slate-950/90 px-5 py-4 text-slate-100 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                      />
+                    </label>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRoleRegistration}
+                  disabled={isRegistering || !requiredFieldsComplete}
+                  className="inline-flex items-center justify-center rounded-3xl bg-amber-500 px-6 py-4 text-base font-black uppercase tracking-[0.16em] text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isRegistering ? 'Registering…' : 'Complete Onboarding'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Interactive Consensus Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 sm:pb-32">
+        <div className="flex flex-col md:flex-row items-end justify-between gap-6 mb-16 border-b border-indigo-100 dark:border-indigo-900 pb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">How it works</h2>
-            <p className="mt-2 text-slate-600 dark:text-slate-300 max-w-2xl">
-              A clean, end-to-end flow: connect → mint → track → transfer.
+            <h2 className="text-3xl sm:text-4xl font-bold text-indigo-900 dark:text-white tracking-tight">Consensus Engine</h2>
+            <p className="mt-3 text-indigo-700/70 dark:text-indigo-300/60 max-w-2xl text-lg font-light">
+              Simulate the multi-signature verification workflow below.
             </p>
           </div>
-
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            Ready for TestNet demos
+          <div className={`flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-colors ${
+            isConsensusReached
+              ? 'bg-amber-500 text-white border-amber-400'
+              : 'bg-white dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900'
+          }`}>
+            <span className={`h-2 w-2 rounded-full ${isConsensusReached ? 'bg-white animate-pulse' : 'bg-amber-500'}`} />
+            {isConsensusReached ? 'Consensus Reached' : `${approvedCount}/4 Signed`}
           </div>
         </div>
 
-        {/* Steps */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Step 1 */}
-          <div
-            className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/40 backdrop-blur
-                          p-6 hover:shadow-lg hover:shadow-slate-200/40 dark:hover:shadow-black/30 transition"
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="shrink-0 inline-flex items-center justify-center h-10 w-10 rounded-xl
-                              bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 font-bold"
-              >
-                1
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Connect Wallet</h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Use Pera, Defly, Exodus, or KMD on localnet. One click to connect.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 h-px bg-slate-100 dark:bg-slate-800" />
-
-            <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Wallet sign-in</span>
-              <span className="group-hover:text-teal-600 dark:group-hover:text-teal-300 transition">Instant</span>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div
-            className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/40 backdrop-blur
-                          p-6 hover:shadow-lg hover:shadow-slate-200/40 dark:hover:shadow-black/30 transition"
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="shrink-0 inline-flex items-center justify-center h-10 w-10 rounded-xl
-                              bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 font-bold"
-              >
-                2
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Create ASA</h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Define asset properties: name, symbol, supply, and optional metadata URL.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 h-px bg-slate-100 dark:bg-slate-800" />
-
-            <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Mint on TestNet</span>
-              <span className="group-hover:text-teal-600 dark:group-hover:text-teal-300 transition">Fast</span>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div
-            className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/40 backdrop-blur
-                          p-6 hover:shadow-lg hover:shadow-slate-200/40 dark:hover:shadow-black/30 transition"
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="shrink-0 inline-flex items-center justify-center h-10 w-10 rounded-xl
-                              bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 font-bold"
-              >
-                3
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Track Assets</h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                  View your created assets in a local history table (stored in your browser).
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 h-px bg-slate-100 dark:bg-slate-800" />
-
-            <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Local history</span>
-              <span className="group-hover:text-teal-600 dark:group-hover:text-teal-300 transition">Simple</span>
-            </div>
-          </div>
-
-          {/* Step 4 */}
-          <div
-            className="group rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/40 backdrop-blur
-                          p-6 hover:shadow-lg hover:shadow-slate-200/40 dark:hover:shadow-black/30 transition"
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="shrink-0 inline-flex items-center justify-center h-10 w-10 rounded-xl
-                              bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 font-bold"
-              >
-                4
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Transfer Assets</h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Send ALGO, TestNet USDC, or any ASA using the built-in transfer tool.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 h-px bg-slate-100 dark:bg-slate-800" />
-
-            <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Built-in transfers</span>
-              <span className="group-hover:text-teal-600 dark:group-hover:text-teal-300 transition">All-in-one</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Features Highlight */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-6">Compliance-Ready Features</h2>
-            <ul className="space-y-4">
-              <li className="flex gap-3">
-                <span className="text-blue-600 font-bold text-xl">✓</span>
-                <span className="text-gray-700 dark:text-gray-300">
-                  <strong>Manager Role:</strong> Update asset settings
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="text-blue-600 font-bold text-xl">✓</span>
-                <span className="text-gray-700 dark:text-gray-300">
-                  <strong>Freeze Account:</strong> Restrict transfers
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="text-blue-600 font-bold text-xl">✓</span>
-                <span className="text-gray-700 dark:text-gray-300">
-                  <strong>Clawback Authority:</strong> Recover tokens if needed
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <span className="text-blue-600 font-bold text-xl">✓</span>
-                <span className="text-gray-700 dark:text-gray-300">
-                  <strong>Metadata Support:</strong> Link off-chain documentation
-                </span>
-              </li>
-            </ul>
-          </div>
-          <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-8">
-            <div className="bg-white dark:bg-slate-700 rounded border border-slate-300 dark:border-slate-600 p-6">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 font-mono">Asset Configuration Example</p>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Name:</span>{' '}
-                  <span className="font-semibold text-gray-900 dark:text-white">Real Estate Token</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Symbol:</span>{' '}
-                  <span className="font-semibold text-gray-900 dark:text-white">PROPERTY</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Total Supply:</span>{' '}
-                  <span className="font-semibold text-gray-900 dark:text-white">1,000,000</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Decimals:</span>{' '}
-                  <span className="font-semibold text-gray-900 dark:text-white">2</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Manager:</span>{' '}
-                  <span className="font-semibold text-gray-900 dark:text-white">Your Wallet</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <ConsensusNode id="01" role="AI Oracle" isApproved={approvals['01']} onToggle={() => toggleNode('01')} desc="Automated geospatial and title analysis." />
+          <ConsensusNode id="02" role="Surveyor" isApproved={approvals['02']} onToggle={() => toggleNode('02')} desc="Physical boundary validation." />
+          <ConsensusNode id="03" role="Realtor" isApproved={approvals['03']} onToggle={() => toggleNode('03')} desc="Market valuation assessment." />
+          <ConsensusNode id="04" role="Govt Agent" isApproved={approvals['04']} onToggle={() => toggleNode('04')} desc="Regulatory registry alignment." />
         </div>
       </div>
 
       {/* CTA Section */}
-      <div className="bg-teal-600 dark:bg-teal-700 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to get started?</h2>
-          <p className="text-lg text-teal-100 mb-8 max-w-2xl mx-auto">
-            Launch your first RWA token in minutes. No complicated setup, no hidden fees.
-          </p>
+      <div className="bg-indigo-900 dark:bg-white text-white dark:text-indigo-950">
+        <div className="max-w-5xl mx-auto px-4 py-24 text-center">
+          <h2 className="text-4xl font-bold mb-8 italic">Initiate Truth Engine</h2>
           <Link
-            to="/tokenize"
-            className={`inline-block px-8 py-3 rounded-lg font-semibold transition ${
-              activeAddress
-                ? 'bg-white text-teal-600 dark:bg-slate-800 dark:text-teal-400 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-md'
-                : 'bg-teal-400 text-white cursor-not-allowed'
+            to={user.role === 'UNREGISTERED' ? '/' : '/dashboard'}
+            className={`inline-block px-12 py-5 rounded-xl font-black text-lg transition-all shadow-2xl ${
+              activeAddress ? 'bg-amber-500 text-white hover:scale-105' : 'bg-indigo-800 text-indigo-600 cursor-not-allowed opacity-50'
             }`}
           >
-            Create Your First Asset
+            {activeAddress ? 'Launch Registration Portal' : 'Connect Wallet to Start'}
           </Link>
         </div>
       </div>

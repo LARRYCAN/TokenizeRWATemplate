@@ -1,93 +1,74 @@
-import { SupportedWallet, WalletId, WalletManager, WalletProvider } from '@txnlab/use-wallet-react'
-import { Analytics } from '@vercel/analytics/react'
-import { SnackbarProvider } from 'notistack'
 import { useMemo } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import algosdk from 'algosdk'
+import { WalletProvider, WalletId } from '@txnlab/use-wallet-react'
+import { WalletManager, type SupportedWallet } from '@txnlab/use-wallet'
+import { HashRouter as Router, Routes, Route } from 'react-router-dom'
+import { SnackbarProvider } from 'notistack'
+
+// Verified template utility paths
+import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
+
+// Component Imports based on your folder structure
 import Home from './Home'
-import Layout from './Layout'
+import Dashboard from './views/Dashboard'
 import TokenizePage from './TokenizePage'
-import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
-
-// Get Web3Auth client ID from environment
-const web3AuthClientId = (import.meta.env.VITE_WEB3AUTH_CLIENT_ID ?? '').trim()
-
-/**
- * Build supported wallets list based on env/network.
- * NOTE: Web3Auth defaults to sapphire_mainnet unless web3AuthNetwork is provided.
- */
-function buildSupportedWallets(): SupportedWallet[] {
-  if (import.meta.env.VITE_ALGOD_NETWORK === 'localnet') {
-    const kmdConfig = getKmdConfigFromViteEnvironment()
-    return [
-      {
-        id: WalletId.KMD,
-        options: {
-          baseServer: kmdConfig.server,
-          token: String(kmdConfig.token),
-          port: String(kmdConfig.port),
-        },
-      },
-      { id: WalletId.LUTE },
-    ]
-  }
-
-  // TestNet/MainNet wallets
-  const wallets: SupportedWallet[] = [{ id: WalletId.PERA }, { id: WalletId.DEFLY }, { id: WalletId.LUTE }]
-
-  // Only add Web3Auth if we actually have a client id
-  // use-wallet v4.4.0+ includes built-in Web3Auth provider
-  if (web3AuthClientId) {
-    wallets.push({
-      id: WalletId.WEB3AUTH,
-      options: {
-        clientId: web3AuthClientId,
-        web3AuthNetwork: 'sapphire_devnet', // Use 'sapphire_mainnet' for production
-        uiConfig: {
-          appName: 'Tokenize RWA Template',
-          mode: 'auto', // 'auto' | 'light' | 'dark'
-        },
-      },
-    })
-  }
-
-  return wallets
-}
+import Layout from './Layout'
 
 export default function App() {
   const algodConfig = getAlgodConfigFromViteEnvironment()
 
-  const supportedWallets = useMemo(() => buildSupportedWallets(), [])
   const walletManager = useMemo(() => {
+    const network = algodConfig.network || 'testnet'
+    const web3AuthClientId = import.meta.env.VITE_WEB3AUTH_CLIENT_ID
+    const web3AuthNetwork = import.meta.env.VITE_WEB3AUTH_NETWORK || 'testnet'
+
+    const wallets: SupportedWallet[] = [
+      { id: WalletId.PERA },
+      { id: WalletId.DEFLY },
+    ]
+
+    if (web3AuthClientId) {
+      wallets.push({
+        id: WalletId.WEB3AUTH,
+        options: {
+          clientId: web3AuthClientId,
+          web3AuthNetwork,
+          uiConfig: {
+            appName: 'TokenizeRWA',
+            appUrl: typeof window !== 'undefined' ? window.location.origin : undefined,
+          },
+          usePopup: true,
+        },
+      })
+    }
+
     return new WalletManager({
-      wallets: supportedWallets,
-      defaultNetwork: algodConfig.network,
+      wallets,
       networks: {
-        [algodConfig.network]: {
+        [network]: {
           algod: {
-            baseServer: algodConfig.server,
-            port: algodConfig.port,
-            token: String(algodConfig.token),
+            baseServer: algodConfig.server || 'https://testnet-api.algonode.cloud',
+            port: algodConfig.port || '',
+            token: (algodConfig.token as string | algosdk.AlgodTokenHeader) || '',
           },
         },
       },
-      options: {
-        resetNetwork: true,
-      },
+      defaultNetwork: network,
     })
-  }, [algodConfig.network, algodConfig.server, algodConfig.port, algodConfig.token, supportedWallets])
+  }, [algodConfig.server, algodConfig.port, algodConfig.token, algodConfig.network])
 
   return (
     <SnackbarProvider maxSnack={3}>
       <WalletProvider manager={walletManager}>
-        <BrowserRouter>
-          <Analytics />
+        <Router>
           <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/tokenize" element={<TokenizePage />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Home />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="tokenize" element={<TokenizePage />} />
             </Route>
           </Routes>
-        </BrowserRouter>
+        </Router>
       </WalletProvider>
     </SnackbarProvider>
   )
