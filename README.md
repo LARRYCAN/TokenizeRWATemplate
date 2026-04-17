@@ -109,6 +109,8 @@ Next, go to your Web3Auth Dashboard. Inside your project settings, find Domains 
 
 This step is very important — it allows the Web3Auth wallet to work properly on your website.
 
+Note* Make sure you pick the network to work on is Algorand Testnet on the Web3 Auth Dashboard!
+
 <img width="2908" height="1270" alt="image" src="https://github.com/user-attachments/assets/9e42fe72-02bb-4d2e-a29d-0fca3ccca272" />
 
 ---
@@ -162,7 +164,7 @@ projects/TokenizeRWATemplate-contracts/NFT_mint_server
 Run the server:
 
 ```
-bash npm start 
+npm run dev
 ```
 Important (Codespaces / Remote Environments)
 
